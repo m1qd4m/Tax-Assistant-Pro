@@ -13,30 +13,23 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import colors from "@/constants/colors";
-import { FILING_STATUS_LABELS } from "@/constants/taxData";
+import { INCOME_TYPE_LABELS } from "@/constants/taxData";
 import { CalculationEntry, useTax } from "@/context/TaxContext";
 
 const c = colors.light;
 
-function formatCurrency(n: number) {
-  return n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
+function formatPKR(n: number) {
+  if (n >= 10000000) return "₨" + (n / 10000000).toFixed(2) + " Cr";
+  if (n >= 100000) return "₨" + (n / 100000).toFixed(1) + " Lac";
+  return "₨" + Math.round(n).toLocaleString("en-PK");
 }
 
 function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", {
+  return new Date(iso).toLocaleDateString("en-PK", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-}
-
-function formatPercent(n: number) {
-  return (n * 100).toFixed(1) + "%";
 }
 
 export default function HistoryScreen() {
@@ -48,15 +41,11 @@ export default function HistoryScreen() {
   const webBottom = Platform.OS === "web" ? 34 : 0;
 
   const handleClear = () => {
-    if (Platform.OS === "web") {
-      clearHistory();
-      return;
-    }
+    if (Platform.OS === "web") { clearHistory(); return; }
     Alert.alert("Clear History", "Remove all saved calculations?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Clear All",
-        style: "destructive",
+        text: "Clear All", style: "destructive",
         onPress: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           clearHistory();
@@ -65,28 +54,15 @@ export default function HistoryScreen() {
     ]);
   };
 
-  const handleDelete = (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    deleteHistory(id);
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: webTop + 16,
-            borderBottomColor: c.border,
-          },
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: webTop + 16, borderBottomColor: c.border }]}>
         <View>
           <Text style={styles.heading}>History</Text>
           <Text style={styles.subheading}>
             {history.length === 0
               ? "No saved calculations"
-              : `${history.length} calculation${history.length > 1 ? "s" : ""}`}
+              : `${history.length} saved calculation${history.length > 1 ? "s" : ""}`}
           </Text>
         </View>
         {history.length > 0 && (
@@ -99,18 +75,14 @@ export default function HistoryScreen() {
       <FlatList
         data={history}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: webBottom + 120 },
-        ]}
-        scrollEnabled={!!history.length}
+        contentContainerStyle={[styles.list, { paddingBottom: webBottom + 120 }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Feather name="clock" size={44} color={c.border} />
             <Text style={styles.emptyTitle}>No calculations yet</Text>
             <Text style={styles.emptyText}>
-              Use the Calculator tab and save a result
+              Use the Calculator tab and tap "Save"
             </Text>
           </View>
         }
@@ -118,10 +90,11 @@ export default function HistoryScreen() {
           <HistoryCard
             entry={item}
             expanded={expandedId === item.id}
-            onToggle={() =>
-              setExpandedId(expandedId === item.id ? null : item.id)
-            }
-            onDelete={() => handleDelete(item.id)}
+            onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
+            onDelete={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              deleteHistory(item.id);
+            }}
           />
         )}
       />
@@ -130,10 +103,7 @@ export default function HistoryScreen() {
 }
 
 function HistoryCard({
-  entry,
-  expanded,
-  onToggle,
-  onDelete,
+  entry, expanded, onToggle, onDelete,
 }: {
   entry: CalculationEntry;
   expanded: boolean;
@@ -145,17 +115,17 @@ function HistoryCard({
     <View style={styles.card}>
       <Pressable onPress={onToggle} style={styles.cardHeader}>
         <View style={styles.cardLeft}>
-          <Text style={styles.cardIncome}>
-            {formatCurrency(entry.grossIncome)}
-          </Text>
+          <Text style={styles.cardIncome}>{formatPKR(entry.grossIncome)}</Text>
           <Text style={styles.cardMeta}>
-            {FILING_STATUS_LABELS[entry.filingStatus]} · {formatDate(entry.date)}
+            {INCOME_TYPE_LABELS[entry.incomeType]}
+            {entry.isWidow ? " · Widow Relief" : ""}
+            {" · "}{formatDate(entry.date)}
           </Text>
         </View>
         <View style={styles.cardRight}>
-          <Text style={styles.cardTax}>{formatCurrency(result.totalTax)}</Text>
+          <Text style={styles.cardTax}>{formatPKR(result.finalTax)}</Text>
           <Text style={styles.cardRate}>
-            {formatPercent(result.effectiveRate)} eff. rate
+            {(result.effectiveRate * 100).toFixed(1)}% eff. rate
           </Text>
         </View>
         <Feather
@@ -170,23 +140,17 @@ function HistoryCard({
         <>
           <View style={styles.divider} />
           <View style={styles.details}>
-            <DetailRow label="Taxable Income" value={formatCurrency(result.taxableIncome)} />
-            <DetailRow label="Deduction" value={formatCurrency(result.deductionUsed)} />
-            <DetailRow label="Federal Tax" value={formatCurrency(result.federalTax)} />
-            <DetailRow label="Social Security" value={formatCurrency(result.socialSecurityTax)} />
-            <DetailRow label="Medicare" value={formatCurrency(result.medicareTax)} />
-            <DetailRow
-              label="Take-Home"
-              value={formatCurrency(result.afterTaxIncome)}
-              highlight
-            />
+            <DetailRow label="Annual Income" value={formatPKR(entry.grossIncome)} />
+            <DetailRow label="Tax Before Relief" value={formatPKR(result.taxBeforeRelief)} />
+            {entry.isWidow && (
+              <DetailRow label="Widow Relief (50%)" value={`– ${formatPKR(result.widowRelief)}`} highlight />
+            )}
+            <DetailRow label="Final Tax" value={formatPKR(result.finalTax)} />
+            <DetailRow label="Take-Home" value={formatPKR(result.afterTaxIncome)} highlight />
           </View>
           <View style={styles.divider} />
           <Pressable
-            style={({ pressed }) => [
-              styles.deleteBtn,
-              pressed && { opacity: 0.7 },
-            ]}
+            style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}
             onPress={onDelete}
           >
             <Feather name="trash-2" size={14} color={c.destructive} />
@@ -198,24 +162,11 @@ function HistoryCard({
   );
 }
 
-function DetailRow({
-  label,
-  value,
-  highlight = false,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
+function DetailRow({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.detailValue,
-          highlight && { color: c.accent, fontFamily: "Inter_700Bold" },
-        ]}
-      >
+      <Text style={[styles.detailValue, highlight && { color: c.accent, fontFamily: "Inter_700Bold" }]}>
         {value}
       </Text>
     </View>
@@ -232,46 +183,14 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
   },
-  heading: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    color: c.foreground,
-    marginBottom: 2,
-  },
-  subheading: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: c.mutedForeground,
-  },
-  clearBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  clearBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: c.destructive,
-  },
-  list: {
-    padding: 20,
-    gap: 12,
-  },
-  empty: {
-    alignItems: "center",
-    paddingTop: 80,
-    gap: 10,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: c.mutedForeground,
-  },
-  emptyText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: c.mutedForeground,
-    textAlign: "center",
-  },
+  heading: { fontSize: 28, fontFamily: "Inter_700Bold", color: c.foreground, marginBottom: 2 },
+  subheading: { fontSize: 13, fontFamily: "Inter_400Regular", color: c.mutedForeground },
+  clearBtn: { paddingVertical: 6, paddingHorizontal: 12 },
+  clearBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.destructive },
+  list: { padding: 20, gap: 12 },
+  empty: { alignItems: "center", paddingTop: 80, gap: 10 },
+  emptyTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: c.mutedForeground },
+  emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground, textAlign: "center" },
   card: {
     backgroundColor: c.card,
     borderRadius: colors.radius + 2,
@@ -279,58 +198,18 @@ const styles = StyleSheet.create({
     borderColor: c.border,
     overflow: "hidden",
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-  },
+  cardHeader: { flexDirection: "row", alignItems: "center", padding: 16 },
   cardLeft: { flex: 1 },
-  cardIncome: {
-    fontSize: 17,
-    fontFamily: "Inter_700Bold",
-    color: c.foreground,
-  },
-  cardMeta: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: c.mutedForeground,
-    marginTop: 2,
-  },
+  cardIncome: { fontSize: 17, fontFamily: "Inter_700Bold", color: c.foreground },
+  cardMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 2 },
   cardRight: { alignItems: "flex-end" },
-  cardTax: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: c.foreground,
-  },
-  cardRate: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: c.mutedForeground,
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: c.border,
-    marginHorizontal: 16,
-  },
-  details: {
-    padding: 16,
-    gap: 10,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: c.mutedForeground,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: c.foreground,
-  },
+  cardTax: { fontSize: 16, fontFamily: "Inter_700Bold", color: c.foreground },
+  cardRate: { fontSize: 11, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 2 },
+  divider: { height: 1, backgroundColor: c.border, marginHorizontal: 16 },
+  details: { padding: 16, gap: 10 },
+  detailRow: { flexDirection: "row", justifyContent: "space-between" },
+  detailLabel: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
+  detailValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: c.foreground },
   deleteBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -338,9 +217,5 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 12,
   },
-  deleteBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: c.destructive,
-  },
+  deleteBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.destructive },
 });

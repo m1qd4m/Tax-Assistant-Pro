@@ -15,54 +15,59 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import colors from "@/constants/colors";
-import { FILING_STATUS_LABELS, FilingStatus, STANDARD_DEDUCTIONS } from "@/constants/taxData";
+import {
+  INCOME_TYPE_DESCRIPTIONS,
+  INCOME_TYPE_LABELS,
+  IncomeType,
+  TAX_YEAR,
+} from "@/constants/taxData";
 import { useTax } from "@/context/TaxContext";
-import { useColors } from "@/hooks/useColors";
 
 const c = colors.light;
 
-function formatCurrency(n: number) {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+function formatPKR(n: number) {
+  if (n >= 10000000) return "₨" + (n / 10000000).toFixed(2) + " Cr";
+  if (n >= 100000) return "₨" + (n / 100000).toFixed(2) + " Lac";
+  return "₨" + Math.round(n).toLocaleString("en-PK");
 }
 
-function formatPercent(n: number) {
-  return (n * 100).toFixed(1) + "%";
+function formatInputDisplay(raw: string) {
+  const n = parseInt(raw.replace(/,/g, ""), 10);
+  if (isNaN(n)) return "";
+  return n.toLocaleString("en-PK");
 }
 
-const FILING_STATUSES: FilingStatus[] = ["single", "married_jointly", "head_of_household"];
+const INCOME_TYPES: IncomeType[] = ["salaried", "non_salaried", "it_freelancer"];
 
 export default function CalculatorScreen() {
   const insets = useSafeAreaInsets();
   const {
     grossIncome, setGrossIncome,
-    filingStatus, setFilingStatus,
-    useItemized, setUseItemized,
-    itemizedAmount, setItemizedAmount,
-    result,
+    monthlyIncome, setMonthlyIncome,
+    useMonthly, setUseMonthly,
+    incomeType, setIncomeType,
+    isWidow, setIsWidow,
+    result, derivedAnnual,
     saveToHistory,
   } = useTax();
+
   const [saved, setSaved] = useState(false);
+
+  const webTop = Platform.OS === "web" ? 67 : insets.top;
+  const webBottom = Platform.OS === "web" ? 34 : 0;
 
   const handleSave = () => {
     if (!result) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     saveToHistory();
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 2500);
   };
 
-  const handleIncomeChange = (text: string) => {
+  const handleRawChange = (text: string, setter: (v: string) => void) => {
     setSaved(false);
-    const digits = text.replace(/[^0-9]/g, "");
-    setGrossIncome(digits);
+    setter(text.replace(/[^0-9]/g, ""));
   };
-
-  const displayIncome = grossIncome
-    ? parseInt(grossIncome, 10).toLocaleString("en-US")
-    : "";
-
-  const webTop = Platform.OS === "web" ? 67 : insets.top;
-  const webBottom = Platform.OS === "web" ? 34 : 0;
 
   return (
     <KeyboardAvoidingView
@@ -77,161 +82,218 @@ export default function CalculatorScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.heading}>Tax Calculator</Text>
-        <Text style={styles.subheading}>2024 Federal Tax Estimate</Text>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Gross Annual Income</Text>
-          <View style={styles.inputRow}>
-            <Text style={styles.currencySymbol}>$</Text>
-            <TextInput
-              style={styles.incomeInput}
-              value={displayIncome}
-              onChangeText={handleIncomeChange}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor={c.mutedForeground}
-            />
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <View style={styles.logoMark}>
+            <Text style={styles.logoText}>₨</Text>
+          </View>
+          <View>
+            <Text style={styles.heading}>Tax Calculator</Text>
+            <Text style={styles.subheading}>Pakistan FBR · Tax Year {TAX_YEAR}</Text>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Filing Status</Text>
-          <View style={styles.pills}>
-            {FILING_STATUSES.map((status) => (
-              <Pressable
-                key={status}
-                style={[
-                  styles.pill,
-                  filingStatus === status && styles.pillActive,
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setFilingStatus(status);
-                  setSaved(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.pillText,
-                    filingStatus === status && styles.pillTextActive,
-                  ]}
-                >
-                  {FILING_STATUS_LABELS[status]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.row}>
-            <View style={styles.flex}>
-              <Text style={styles.label}>Use Itemized Deduction</Text>
-              <Text style={styles.hint}>
-                Standard: {formatCurrency(STANDARD_DEDUCTIONS[filingStatus])}
-              </Text>
-            </View>
-            <Switch
-              value={useItemized}
-              onValueChange={(v) => {
+        {/* Step 1: Who are you? */}
+        <SectionLabel step="1" title="What best describes you?" />
+        <View style={styles.typeList}>
+          {INCOME_TYPES.map((type) => (
+            <Pressable
+              key={type}
+              style={[styles.typeCard, incomeType === type && styles.typeCardActive]}
+              onPress={() => {
                 Haptics.selectionAsync();
-                setUseItemized(v);
+                setIncomeType(type);
                 setSaved(false);
               }}
-              trackColor={{ false: c.border, true: c.primary }}
-              thumbColor={"#FFFFFF"}
-            />
-          </View>
-          {useItemized && (
-            <View style={[styles.inputRow, { marginTop: 10 }]}>
-              <Text style={styles.currencySymbol}>$</Text>
+            >
+              <View style={styles.typeCardInner}>
+                <View style={[styles.radio, incomeType === type && styles.radioActive]}>
+                  {incomeType === type && <View style={styles.radioDot} />}
+                </View>
+                <View style={styles.typeText}>
+                  <Text style={[styles.typeLabel, incomeType === type && styles.typeLabelActive]}>
+                    {INCOME_TYPE_LABELS[type]}
+                  </Text>
+                  <Text style={styles.typeDesc}>{INCOME_TYPE_DESCRIPTIONS[type]}</Text>
+                </View>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Step 2: Income */}
+        <SectionLabel step="2" title="What is your income?" />
+
+        <View style={styles.incomeToggleRow}>
+          <Pressable
+            style={[styles.incomeToggleBtn, !useMonthly && styles.incomeToggleBtnActive]}
+            onPress={() => { Haptics.selectionAsync(); setUseMonthly(false); setSaved(false); }}
+          >
+            <Text style={[styles.incomeToggleText, !useMonthly && styles.incomeToggleTextActive]}>
+              I know my annual income
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.incomeToggleBtn, useMonthly && styles.incomeToggleBtnActive]}
+            onPress={() => { Haptics.selectionAsync(); setUseMonthly(true); setSaved(false); }}
+          >
+            <Text style={[styles.incomeToggleText, useMonthly && styles.incomeToggleTextActive]}>
+              I'll enter monthly
+            </Text>
+          </Pressable>
+        </View>
+
+        {!useMonthly ? (
+          <View style={styles.inputCard}>
+            <Text style={styles.inputLabel}>Annual Income (PKR)</Text>
+            <View style={styles.inputRow}>
+              <Text style={styles.currencySymbol}>₨</Text>
               <TextInput
                 style={styles.incomeInput}
-                value={itemizedAmount}
-                onChangeText={(t) => {
-                  setItemizedAmount(t.replace(/[^0-9]/g, ""));
-                  setSaved(false);
-                }}
+                value={formatInputDisplay(grossIncome)}
+                onChangeText={(t) => handleRawChange(t, setGrossIncome)}
                 keyboardType="numeric"
-                placeholder="Enter itemized amount"
+                placeholder="0"
                 placeholderTextColor={c.mutedForeground}
               />
             </View>
-          )}
+          </View>
+        ) : (
+          <View style={styles.inputCard}>
+            <Text style={styles.inputLabel}>Monthly Income (PKR)</Text>
+            <View style={styles.inputRow}>
+              <Text style={styles.currencySymbol}>₨</Text>
+              <TextInput
+                style={styles.incomeInput}
+                value={formatInputDisplay(monthlyIncome)}
+                onChangeText={(t) => handleRawChange(t, setMonthlyIncome)}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={c.mutedForeground}
+              />
+            </View>
+            {parseFloat(monthlyIncome) > 0 && (
+              <View style={styles.annualHint}>
+                <Feather name="info" size={13} color={c.primary} />
+                <Text style={styles.annualHintText}>
+                  Annual equivalent: {formatPKR(parseFloat(monthlyIncome.replace(/,/g, "")) * 12)}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Step 3: Special status */}
+        <SectionLabel step="3" title="Any special status?" />
+        <View style={styles.switchCard}>
+          <View style={styles.switchRow}>
+            <View style={styles.flex}>
+              <Text style={styles.switchLabel}>I am a widow / widower</Text>
+              <Text style={styles.switchHint}>
+                Widows receive a 50% relief on computed tax under FBR provisions
+              </Text>
+            </View>
+            <Switch
+              value={isWidow}
+              onValueChange={(v) => {
+                Haptics.selectionAsync();
+                setIsWidow(v);
+                setSaved(false);
+              }}
+              trackColor={{ false: c.border, true: c.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
         </View>
 
-        {result && (
+        {/* Results */}
+        {result && derivedAnnual > 0 ? (
           <>
             <View style={styles.resultCard}>
-              <Text style={styles.resultTitle}>Estimated Tax Breakdown</Text>
+              <Text style={styles.resultTitle}>Your Tax Estimate</Text>
 
               <View style={styles.resultMain}>
-                <Text style={styles.totalTaxLabel}>Total Tax</Text>
-                <Text style={styles.totalTaxAmount}>{formatCurrency(result.totalTax)}</Text>
+                <Text style={styles.totalTaxLabel}>Total Tax Payable</Text>
+                <Text style={styles.totalTaxAmount}>{formatPKR(result.finalTax)}</Text>
                 <View style={styles.rateRow}>
-                  <View style={styles.rateChip}>
-                    <Text style={styles.rateChipText}>
-                      {formatPercent(result.effectiveRate)} effective
-                    </Text>
-                  </View>
-                  <View style={[styles.rateChip, styles.rateChipSecondary]}>
-                    <Text style={[styles.rateChipText, styles.rateChipTextSecondary]}>
-                      {formatPercent(result.marginalRate)} marginal
-                    </Text>
-                  </View>
+                  <RateChip label={`${(result.effectiveRate * 100).toFixed(1)}% effective`} primary />
+                  <RateChip label={`${(result.marginalRate * 100).toFixed(0)}% marginal`} />
                 </View>
               </View>
 
               <View style={styles.divider} />
 
-              <View style={styles.breakdown}>
-                <ResultRow label="Taxable Income" value={formatCurrency(result.taxableIncome)} />
-                <ResultRow label="Deduction Used" value={formatCurrency(result.deductionUsed)} />
-              </View>
-
-              <View style={styles.divider} />
-
-              <View style={styles.breakdown}>
-                <ResultRow label="Federal Income Tax" value={formatCurrency(result.federalTax)} />
-                <ResultRow label="Social Security (6.2%)" value={formatCurrency(result.socialSecurityTax)} />
-                <ResultRow label="Medicare (1.45%+)" value={formatCurrency(result.medicareTax)} />
-              </View>
+              {result.isITFreelancer ? (
+                <View style={styles.breakdown}>
+                  <ResultRow label="Annual Income" value={formatPKR(result.grossIncome)} />
+                  <ResultRow label="Tax Rate (Final)" value="0.25% on foreign remittance" />
+                  <ResultRow label="Tax Payable" value={formatPKR(result.finalTax)} />
+                </View>
+              ) : (
+                <View style={styles.breakdown}>
+                  <ResultRow label="Annual Income" value={formatPKR(result.grossIncome)} />
+                  <ResultRow label="Tax on Income" value={formatPKR(result.taxBeforeRelief)} />
+                  {isWidow && (
+                    <ResultRow
+                      label="Widow Relief (50%)"
+                      value={`– ${formatPKR(result.widowRelief)}`}
+                      accent
+                    />
+                  )}
+                  <ResultRow label="Final Tax" value={formatPKR(result.finalTax)} bold />
+                </View>
+              )}
 
               <View style={styles.divider} />
 
               <View style={styles.takeHomeRow}>
-                <Text style={styles.takeHomeLabel}>Est. Take-Home</Text>
-                <Text style={styles.takeHomeValue}>{formatCurrency(result.afterTaxIncome)}</Text>
+                <View>
+                  <Text style={styles.takeHomeLabel}>Estimated Take-Home</Text>
+                  <Text style={styles.takeHomeSub}>
+                    {formatPKR(result.afterTaxIncome / 12)} / month
+                  </Text>
+                </View>
+                <Text style={styles.takeHomeValue}>{formatPKR(result.afterTaxIncome)}</Text>
               </View>
             </View>
+
+            {result.taxBeforeRelief === 0 && !result.isITFreelancer && (
+              <View style={styles.zeroTaxBanner}>
+                <Feather name="check-circle" size={18} color={c.success} />
+                <Text style={styles.zeroTaxText}>
+                  Your income is below the taxable threshold. No tax is due.
+                </Text>
+              </View>
+            )}
 
             <Pressable
               style={({ pressed }) => [
                 styles.saveBtn,
-                pressed && styles.saveBtnPressed,
+                pressed && { opacity: 0.7 },
                 saved && styles.saveBtnSaved,
               ]}
               onPress={handleSave}
             >
-              <Feather
-                name={saved ? "check" : "bookmark"}
-                size={16}
-                color={saved ? c.success : c.primary}
-              />
-              <Text style={[styles.saveBtnText, saved && styles.saveBtnTextSaved]}>
+              <Feather name={saved ? "check" : "bookmark"} size={16} color={saved ? c.success : c.primary} />
+              <Text style={[styles.saveBtnText, saved && { color: c.success }]}>
                 {saved ? "Saved to History" : "Save Calculation"}
               </Text>
             </Pressable>
-          </>
-        )}
 
-        {!result && (
+            <View style={styles.disclaimer}>
+              <Text style={styles.disclaimerText}>
+                This is an estimate based on FBR tax year {TAX_YEAR} rates. Consult a tax professional or visit fbr.gov.pk for your exact tax liability.
+              </Text>
+            </View>
+          </>
+        ) : (
           <View style={styles.emptyState}>
-            <Feather name="dollar-sign" size={40} color={c.border} />
-            <Text style={styles.emptyTitle}>Enter your income</Text>
+            <View style={styles.emptyIcon}>
+              <Text style={styles.emptyIconText}>₨</Text>
+            </View>
+            <Text style={styles.emptyTitle}>Enter your income above</Text>
             <Text style={styles.emptyText}>
-              Your tax breakdown will appear here
+              Your personalised tax estimate will appear here
             </Text>
           </View>
         )}
@@ -240,11 +302,42 @@ export default function CalculatorScreen() {
   );
 }
 
-function ResultRow({ label, value }: { label: string; value: string }) {
+function SectionLabel({ step, title }: { step: string; title: string }) {
+  return (
+    <View style={styles.sectionLabel}>
+      <View style={styles.stepBadge}>
+        <Text style={styles.stepBadgeText}>{step}</Text>
+      </View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
+function RateChip({ label, primary = false }: { label: string; primary?: boolean }) {
+  return (
+    <View style={[styles.rateChip, primary && styles.rateChipPrimary]}>
+      <Text style={[styles.rateChipText, primary && styles.rateChipTextPrimary]}>{label}</Text>
+    </View>
+  );
+}
+
+function ResultRow({
+  label, value, accent = false, bold = false,
+}: {
+  label: string; value: string; accent?: boolean; bold?: boolean;
+}) {
   return (
     <View style={styles.resultRow}>
       <Text style={styles.resultRowLabel}>{label}</Text>
-      <Text style={styles.resultRowValue}>{value}</Text>
+      <Text
+        style={[
+          styles.resultRowValue,
+          accent && { color: c.accent },
+          bold && { fontFamily: "Inter_700Bold", color: c.foreground },
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -252,148 +345,262 @@ function ResultRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { paddingHorizontal: 20 },
-  heading: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    color: c.foreground,
-    marginBottom: 4,
-  },
-  subheading: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: c.mutedForeground,
+
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
     marginBottom: 28,
   },
-  section: {
-    marginBottom: 24,
+  logoMark: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: c.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  label: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
+  logoText: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: "#FFFFFF",
+  },
+  heading: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+  },
+  subheading: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
     color: c.mutedForeground,
-    marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    marginTop: 1,
   },
-  hint: {
+
+  sectionLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  stepBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: c.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBadgeText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: "#FFFFFF",
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
+
+  typeList: { gap: 8, marginBottom: 24 },
+  typeCard: {
+    borderRadius: colors.radius,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 14,
+  },
+  typeCardActive: {
+    borderColor: c.primary,
+    backgroundColor: c.secondary,
+  },
+  typeCardInner: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: c.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  radioActive: { borderColor: c.primary },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: c.primary,
+  },
+  typeText: { flex: 1 },
+  typeLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: c.mutedForeground,
+  },
+  typeLabelActive: { color: c.primary },
+  typeDesc: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: c.mutedForeground,
     marginTop: 2,
+    lineHeight: 17,
   },
-  inputRow: {
+
+  incomeToggleRow: {
     flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: c.border,
+    backgroundColor: c.muted,
     borderRadius: colors.radius,
-    paddingHorizontal: 14,
-    backgroundColor: c.card,
-    height: 52,
+    padding: 4,
+    marginBottom: 12,
   },
-  currencySymbol: {
-    fontSize: 20,
+  incomeToggleBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: colors.radius - 2,
+    alignItems: "center",
+  },
+  incomeToggleBtnActive: {
+    backgroundColor: c.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  incomeToggleText: {
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: c.mutedForeground,
-    marginRight: 6,
+    textAlign: "center",
   },
-  incomeInput: {
-    flex: 1,
-    fontSize: 22,
-    fontFamily: "Inter_600SemiBold",
-    color: c.foreground,
-  },
-  pills: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  pill: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 100,
+  incomeToggleTextActive: { color: c.foreground },
+
+  inputCard: {
+    backgroundColor: c.card,
+    borderRadius: colors.radius,
     borderWidth: 1.5,
     borderColor: c.border,
-    backgroundColor: c.background,
+    padding: 14,
+    marginBottom: 24,
   },
-  pillActive: {
-    backgroundColor: c.secondary,
-    borderColor: c.primary,
-  },
-  pillText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: c.mutedForeground,
-  },
-  pillTextActive: {
-    color: c.primary,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  resultCard: {
-    backgroundColor: c.card,
-    borderRadius: colors.radius + 4,
-    borderWidth: 1,
-    borderColor: c.border,
-    padding: 20,
-    marginBottom: 16,
-  },
-  resultTitle: {
-    fontSize: 13,
+  inputLabel: {
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
     color: c.mutedForeground,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  resultMain: {
+  inputRow: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+  },
+  currencySymbol: {
+    fontSize: 22,
+    fontFamily: "Inter_600SemiBold",
+    color: c.primary,
+  },
+  incomeInput: {
+    flex: 1,
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: c.foreground,
+    padding: 0,
+  },
+  annualHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+  },
+  annualHintText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.primary,
+  },
+
+  switchCard: {
+    backgroundColor: c.card,
+    borderRadius: colors.radius,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    padding: 14,
+    marginBottom: 24,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  switchLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: c.foreground,
+  },
+  switchHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    marginTop: 3,
+    lineHeight: 17,
+  },
+
+  resultCard: {
+    backgroundColor: c.card,
+    borderRadius: colors.radius + 4,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    padding: 20,
+    marginBottom: 12,
+  },
+  resultTitle: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: c.mutedForeground,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
     marginBottom: 16,
   },
+  resultMain: { alignItems: "center", marginBottom: 16 },
   totalTaxLabel: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: c.mutedForeground,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   totalTaxAmount: {
-    fontSize: 40,
+    fontSize: 38,
     fontFamily: "Inter_700Bold",
     color: c.foreground,
     marginBottom: 10,
   },
-  rateRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  rateRow: { flexDirection: "row", gap: 8 },
   rateChip: {
-    backgroundColor: c.secondary,
+    backgroundColor: c.muted,
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 100,
   },
-  rateChipSecondary: {
-    backgroundColor: c.muted,
-  },
+  rateChipPrimary: { backgroundColor: c.secondary },
   rateChipText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: c.primary,
-  },
-  rateChipTextSecondary: {
     color: c.mutedForeground,
   },
+  rateChipTextPrimary: { color: c.primary },
   divider: {
     height: 1,
     backgroundColor: c.border,
-    marginVertical: 12,
+    marginVertical: 14,
   },
-  breakdown: {
-    gap: 8,
-  },
+  breakdown: { gap: 10 },
   resultRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -419,42 +626,91 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: c.foreground,
   },
+  takeHomeSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    marginTop: 2,
+  },
   takeHomeValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: c.accent,
   },
+
+  zeroTaxBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: c.successLight,
+    borderRadius: colors.radius,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: c.success,
+  },
+  zeroTaxText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: c.success,
+    lineHeight: 18,
+  },
+
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 48,
+    height: 50,
     borderRadius: colors.radius,
     borderWidth: 1.5,
     borderColor: c.primary,
     backgroundColor: c.background,
-    marginBottom: 8,
-  },
-  saveBtnPressed: {
-    opacity: 0.7,
+    marginBottom: 12,
   },
   saveBtnSaved: {
     borderColor: c.success,
     backgroundColor: c.successLight,
   },
   saveBtnText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: c.primary,
   },
-  saveBtnTextSaved: {
-    color: c.success,
+
+  disclaimer: {
+    backgroundColor: c.muted,
+    borderRadius: colors.radius,
+    padding: 12,
+    marginBottom: 8,
   },
+  disclaimerText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: c.mutedForeground,
+    lineHeight: 17,
+    textAlign: "center",
+  },
+
   emptyState: {
     alignItems: "center",
-    paddingTop: 60,
+    paddingTop: 40,
     gap: 10,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: c.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyIconText: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: c.primary,
   },
   emptyTitle: {
     fontSize: 16,
@@ -466,5 +722,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: c.mutedForeground,
     textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 20,
   },
 });

@@ -1,146 +1,224 @@
-export type FilingStatus = "single" | "married_jointly" | "head_of_household";
+export type IncomeType = "salaried" | "non_salaried" | "it_freelancer";
+
+export const INCOME_TYPE_LABELS: Record<IncomeType, string> = {
+  salaried: "Salaried Employee",
+  non_salaried: "Freelancer / Business",
+  it_freelancer: "IT Freelancer (Foreign Income)",
+};
+
+export const INCOME_TYPE_DESCRIPTIONS: Record<IncomeType, string> = {
+  salaried: "Earn a regular monthly salary from an employer",
+  non_salaried: "Self-employed, business owner, or local freelancer",
+  it_freelancer: "Earn from foreign clients via IT/digital services",
+};
 
 export interface TaxBracket {
   min: number;
   max: number | null;
   rate: number;
+  fixedAmount: number;
 }
 
-export const FILING_STATUS_LABELS: Record<FilingStatus, string> = {
-  single: "Single",
-  married_jointly: "Married Filing Jointly",
-  head_of_household: "Head of Household",
-};
-
-export const STANDARD_DEDUCTIONS: Record<FilingStatus, number> = {
-  single: 14600,
-  married_jointly: 29200,
-  head_of_household: 21900,
-};
-
-export const TAX_BRACKETS_2024: Record<FilingStatus, TaxBracket[]> = {
-  single: [
-    { min: 0, max: 11600, rate: 0.10 },
-    { min: 11600, max: 47150, rate: 0.12 },
-    { min: 47150, max: 100525, rate: 0.22 },
-    { min: 100525, max: 191950, rate: 0.24 },
-    { min: 191950, max: 243725, rate: 0.32 },
-    { min: 243725, max: 609350, rate: 0.35 },
-    { min: 609350, max: null, rate: 0.37 },
+export const TAX_BRACKETS_2024: Record<"salaried" | "non_salaried", TaxBracket[]> = {
+  salaried: [
+    { min: 0, max: 600000, rate: 0.00, fixedAmount: 0 },
+    { min: 600000, max: 1200000, rate: 0.05, fixedAmount: 0 },
+    { min: 1200000, max: 2200000, rate: 0.15, fixedAmount: 30000 },
+    { min: 2200000, max: 3200000, rate: 0.25, fixedAmount: 180000 },
+    { min: 3200000, max: 4100000, rate: 0.30, fixedAmount: 430000 },
+    { min: 4100000, max: null, rate: 0.35, fixedAmount: 700000 },
   ],
-  married_jointly: [
-    { min: 0, max: 23200, rate: 0.10 },
-    { min: 23200, max: 94300, rate: 0.12 },
-    { min: 94300, max: 201050, rate: 0.22 },
-    { min: 201050, max: 383900, rate: 0.24 },
-    { min: 383900, max: 487450, rate: 0.32 },
-    { min: 487450, max: 731200, rate: 0.35 },
-    { min: 731200, max: null, rate: 0.37 },
-  ],
-  head_of_household: [
-    { min: 0, max: 16550, rate: 0.10 },
-    { min: 16550, max: 63100, rate: 0.12 },
-    { min: 63100, max: 100500, rate: 0.22 },
-    { min: 100500, max: 191950, rate: 0.24 },
-    { min: 191950, max: 243700, rate: 0.32 },
-    { min: 243700, max: 609350, rate: 0.35 },
-    { min: 609350, max: null, rate: 0.37 },
+  non_salaried: [
+    { min: 0, max: 600000, rate: 0.00, fixedAmount: 0 },
+    { min: 600000, max: 1200000, rate: 0.15, fixedAmount: 0 },
+    { min: 1200000, max: 2400000, rate: 0.20, fixedAmount: 90000 },
+    { min: 2400000, max: 3600000, rate: 0.25, fixedAmount: 330000 },
+    { min: 3600000, max: 6000000, rate: 0.30, fixedAmount: 630000 },
+    { min: 6000000, max: null, rate: 0.35, fixedAmount: 1350000 },
   ],
 };
 
-export const SS_WAGE_BASE_2024 = 168600;
-export const SS_RATE = 0.062;
-export const MEDICARE_RATE = 0.0145;
-export const ADDITIONAL_MEDICARE_RATE = 0.009;
-export const ADDITIONAL_MEDICARE_THRESHOLD: Record<FilingStatus, number> = {
-  single: 200000,
-  married_jointly: 250000,
-  head_of_household: 200000,
-};
+export const IT_FREELANCER_RATE = 0.0025;
+export const WIDOW_RELIEF_RATE = 0.50;
 
 export interface TaxResult {
   grossIncome: number;
-  standardDeduction: number;
-  itemizedDeduction: number;
-  deductionUsed: number;
-  taxableIncome: number;
-  federalTax: number;
-  socialSecurityTax: number;
-  medicareTax: number;
-  totalTax: number;
+  incomeType: IncomeType;
+  isWidow: boolean;
+  taxBeforeRelief: number;
+  widowRelief: number;
+  finalTax: number;
   effectiveRate: number;
   marginalRate: number;
   afterTaxIncome: number;
-  bracketBreakdown: { rate: number; amount: number; taxOnBracket: number }[];
+  bracketBreakdown: {
+    rate: number;
+    amountInBracket: number;
+    taxOnBracket: number;
+  }[];
+  isITFreelancer: boolean;
+}
+
+function computeSlabTax(income: number, brackets: TaxBracket[]): {
+  tax: number;
+  marginalRate: number;
+  breakdown: TaxResult["bracketBreakdown"];
+} {
+  let tax = 0;
+  let marginalRate = 0;
+  const breakdown: TaxResult["bracketBreakdown"] = [];
+
+  for (const bracket of brackets) {
+    if (income <= bracket.min) break;
+    const bracketMax = bracket.max ?? Infinity;
+    const amountInBracket = Math.min(income, bracketMax) - bracket.min;
+    const taxOnBracket =
+      bracket.rate === 0
+        ? 0
+        : bracket.fixedAmount > 0
+        ? bracket.fixedAmount + (amountInBracket * bracket.rate)
+        : amountInBracket * bracket.rate;
+
+    if (bracket.rate > 0) {
+      const lastBracketTax =
+        breakdown.length > 0
+          ? breakdown[breakdown.length - 1].taxOnBracket
+          : 0;
+      breakdown.push({
+        rate: bracket.rate,
+        amountInBracket,
+        taxOnBracket: bracket.fixedAmount > 0
+          ? bracket.fixedAmount + amountInBracket * bracket.rate - (tax)
+          : amountInBracket * bracket.rate,
+      });
+    }
+    if (bracket.rate > 0) {
+      tax = bracket.fixedAmount + (Math.min(income, bracketMax) - bracket.min) * bracket.rate;
+    }
+    if (income <= bracketMax) {
+      marginalRate = bracket.rate;
+      break;
+    }
+    marginalRate = bracket.rate;
+  }
+
+  return { tax: Math.max(0, tax), marginalRate, breakdown };
 }
 
 export function calculateTaxes(
   grossIncome: number,
-  filingStatus: FilingStatus,
-  useItemized: boolean,
-  itemizedAmount: number
+  incomeType: IncomeType,
+  isWidow: boolean
 ): TaxResult {
-  const standardDeduction = STANDARD_DEDUCTIONS[filingStatus];
-  const deductionUsed = useItemized
-    ? Math.max(itemizedAmount, 0)
-    : standardDeduction;
-  const taxableIncome = Math.max(0, grossIncome - deductionUsed);
-
-  const brackets = TAX_BRACKETS_2024[filingStatus];
-  let federalTax = 0;
-  let marginalRate = 0.10;
-  const bracketBreakdown: TaxResult["bracketBreakdown"] = [];
-
-  for (const bracket of brackets) {
-    if (taxableIncome <= bracket.min) break;
-    const bracketMax = bracket.max ?? Infinity;
-    const amountInBracket = Math.min(taxableIncome, bracketMax) - bracket.min;
-    const taxOnBracket = amountInBracket * bracket.rate;
-    federalTax += taxOnBracket;
-    marginalRate = bracket.rate;
-    bracketBreakdown.push({
-      rate: bracket.rate,
-      amount: amountInBracket,
-      taxOnBracket,
-    });
+  if (grossIncome <= 0) {
+    return {
+      grossIncome: 0,
+      incomeType,
+      isWidow,
+      taxBeforeRelief: 0,
+      widowRelief: 0,
+      finalTax: 0,
+      effectiveRate: 0,
+      marginalRate: 0,
+      afterTaxIncome: 0,
+      bracketBreakdown: [],
+      isITFreelancer: incomeType === "it_freelancer",
+    };
   }
 
-  const ssWages = Math.min(grossIncome, SS_WAGE_BASE_2024);
-  const socialSecurityTax = ssWages * SS_RATE;
+  if (incomeType === "it_freelancer") {
+    const finalTax = grossIncome * IT_FREELANCER_RATE;
+    return {
+      grossIncome,
+      incomeType,
+      isWidow,
+      taxBeforeRelief: finalTax,
+      widowRelief: 0,
+      finalTax,
+      effectiveRate: IT_FREELANCER_RATE,
+      marginalRate: IT_FREELANCER_RATE,
+      afterTaxIncome: grossIncome - finalTax,
+      bracketBreakdown: [
+        { rate: IT_FREELANCER_RATE, amountInBracket: grossIncome, taxOnBracket: finalTax },
+      ],
+      isITFreelancer: true,
+    };
+  }
 
-  const additionalMedicareThreshold = ADDITIONAL_MEDICARE_THRESHOLD[filingStatus];
-  const baseMedicareTax = grossIncome * MEDICARE_RATE;
-  const additionalMedicareTax =
-    Math.max(0, grossIncome - additionalMedicareThreshold) * ADDITIONAL_MEDICARE_RATE;
-  const medicareTax = baseMedicareTax + additionalMedicareTax;
+  const brackets =
+    TAX_BRACKETS_2024[incomeType === "salaried" ? "salaried" : "non_salaried"];
 
-  const totalTax = federalTax + socialSecurityTax + medicareTax;
-  const effectiveRate = grossIncome > 0 ? totalTax / grossIncome : 0;
-  const afterTaxIncome = grossIncome - totalTax;
+  let tax = 0;
+  let marginalRate = 0;
+  const breakdown: TaxResult["bracketBreakdown"] = [];
+
+  for (let i = 0; i < brackets.length; i++) {
+    const bracket = brackets[i];
+    if (grossIncome <= bracket.min) break;
+    const bracketMax = bracket.max ?? Infinity;
+
+    if (bracket.rate === 0) {
+      if (grossIncome <= bracketMax) {
+        marginalRate = 0;
+        break;
+      }
+      continue;
+    }
+
+    const amountInBracket = Math.min(grossIncome, bracketMax) - bracket.min;
+    tax = bracket.fixedAmount + amountInBracket * bracket.rate;
+    const taxOnBracket = amountInBracket * bracket.rate;
+
+    breakdown.push({ rate: bracket.rate, amountInBracket, taxOnBracket });
+    marginalRate = bracket.rate;
+
+    if (grossIncome <= bracketMax) break;
+  }
+
+  const taxBeforeRelief = Math.max(0, tax);
+  const widowRelief = isWidow ? taxBeforeRelief * WIDOW_RELIEF_RATE : 0;
+  const finalTax = Math.max(0, taxBeforeRelief - widowRelief);
 
   return {
     grossIncome,
-    standardDeduction,
-    itemizedDeduction: itemizedAmount,
-    deductionUsed,
-    taxableIncome,
-    federalTax,
-    socialSecurityTax,
-    medicareTax,
-    totalTax,
-    effectiveRate,
+    incomeType,
+    isWidow,
+    taxBeforeRelief,
+    widowRelief,
+    finalTax,
+    effectiveRate: grossIncome > 0 ? finalTax / grossIncome : 0,
     marginalRate,
-    afterTaxIncome,
-    bracketBreakdown,
+    afterTaxIncome: grossIncome - finalTax,
+    bracketBreakdown: breakdown,
+    isITFreelancer: false,
   };
 }
 
 export const BRACKET_COLORS: Record<number, string> = {
-  0.10: "#6EE7B7",
-  0.12: "#34D399",
-  0.22: "#FCD34D",
-  0.24: "#FBBF24",
-  0.32: "#FB923C",
-  0.35: "#F87171",
-  0.37: "#EF4444",
+  0.00: "#D1FAE5",
+  0.05: "#A7F3D0",
+  0.15: "#6EE7B7",
+  0.20: "#FCD34D",
+  0.25: "#FBBF24",
+  0.30: "#FB923C",
+  0.35: "#EF4444",
+  0.0025: "#A7F3D0",
 };
+
+export const INCOME_GUIDE_QUESTIONS = [
+  {
+    id: "daily_worker",
+    question: "Do you work daily or weekly and get paid in cash?",
+    hint: "e.g., shop owner, daily wage worker",
+    multiplier: { daily: 365, weekly: 52 },
+  },
+  {
+    id: "monthly_salary",
+    question: "What is your monthly salary or earnings?",
+    hint: "We will calculate your annual income",
+    multiplier: 12,
+  },
+];
+
+export const TAX_YEAR = "2024–25";
+export const TAX_AUTHORITY = "FBR (Federal Board of Revenue)";
