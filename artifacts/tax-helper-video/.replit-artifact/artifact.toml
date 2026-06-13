@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/tax-helper-video/"
+title = "Tax Helper Video"
+version = "1.0.0"
+id = "artifacts/tax-helper-video"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/tax-helper-video/" ]
+localPort = 19354
+
+[services.development]
+run = "pnpm --filter @workspace/tax-helper-video run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/tax-helper-video", "run", "build" ]
+publicDir = "artifacts/tax-helper-video/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19354"
+BASE_PATH = "/tax-helper-video/"
