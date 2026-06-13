@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -38,6 +38,13 @@ export default function ResultsScreen() {
 
   const profInfo = PROFESSION_OPTIONS.find((p) => p.key === professionCategory);
 
+  // Redirect to start if wizard hasn't been completed
+  useEffect(() => {
+    if (!result) {
+      router.replace("/wizard/1-personal");
+    }
+  }, [result]);
+
   const handleSave = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     saveResult();
@@ -50,14 +57,7 @@ export default function ResultsScreen() {
   };
 
   if (!result) {
-    return (
-      <View style={[styles.center, { backgroundColor: c.background }]}>
-        <Text style={styles.errorText}>Something went wrong. Please try again.</Text>
-        <Pressable onPress={handleStartAgain} style={styles.retryBtn}>
-          <Text style={styles.retryBtnText}>Start Again</Text>
-        </Pressable>
-      </View>
-    );
+    return <View style={[styles.container, { backgroundColor: c.background }]} />;
   }
 
   return (

@@ -135,7 +135,7 @@ export default function FamilyScreen() {
         </>
       )}
 
-      {!showWidowExtras && maritalStatus && (
+      {!showWidowExtras && !!maritalStatus && (
         <View style={styles.infoCard}>
           <Text style={styles.infoText}>
             {maritalStatus === "married"
