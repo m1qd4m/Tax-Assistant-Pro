@@ -81,37 +81,50 @@ Tax-Assistant-Pro/
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting Started (Windows Setup Guide)
 
-### Prerequisites
+Since Node.js and `pnpm` are not yet installed on your system, follow these steps to set up the environment and run the app.
 
-- [Node.js 20+](https://nodejs.org/)
-- [pnpm](https://pnpm.io/) — `npm install -g pnpm`
-- [Expo Go](https://expo.dev/go) app on your phone (for testing)
+### 1. Install Node.js
+Choose **one** of the following ways to install Node.js (Version 20+ LTS recommended):
 
-### Installation
+* **Option A (Fastest via Terminal):**
+  Open PowerShell as Administrator and run:
+  ```powershell
+  winget install OpenJS.NodeJS.LTS
+  ```
+  *(Restart your terminal after installation so the paths update).*
+  
+* **Option B (Direct Download):**
+  Download and run the installer from the official website: [nodejs.org](https://nodejs.org/)
 
-```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/Tax-Assistant-Pro.git
-cd Tax-Assistant-Pro
+### 2. Install pnpm (Package Manager)
+Once Node.js is installed, open a new terminal window and run:
+```powershell
+npm install -g pnpm
+```
 
-# Install dependencies
+### 3. Install App Dependencies
+Navigate to your project directory and install the packages:
+```powershell
 pnpm install
-
-# Start the mobile app
-pnpm --filter @workspace/mobile run dev
 ```
 
-Scan the QR code with **Expo Go** on your phone, or press `w` to open in your browser.
-
-### Running the API Server (optional)
-
-```bash
-pnpm --filter @workspace/api-server run dev
+### 4. Start the Mobile App
+Run the development server for the mobile app:
+```powershell
+pnpm --filter @workspace/mobile dev
 ```
+Press `w` in your terminal to open it in your browser, or install the free **Expo Go** app on your phone and scan the QR code displayed in the terminal.
 
-Requires a `DATABASE_URL` environment variable (PostgreSQL connection string).
+---
+
+### 💻 Running the API Backend (Optional)
+To run the database and backend server:
+```powershell
+pnpm --filter @workspace/api-server dev
+```
+*Note: Requires a PostgreSQL database URL set in your environment variables.*
 
 ---
 

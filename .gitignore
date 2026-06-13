@@ -68,7 +68,6 @@ build/
 
 # replit junk
 .agents/
-artifacts/
 attached_assets/
 
 # android/ios junk
