@@ -14,7 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { TaxProvider } from "@/context/TaxContext";
+import { WizardProvider } from "@/context/WizardContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -22,8 +22,9 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="wizard" options={{ animation: "slide_from_right" }} />
     </Stack>
   );
 }
@@ -50,9 +51,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <TaxProvider>
+              <WizardProvider>
                 <RootLayoutNav />
-              </TaxProvider>
+              </WizardProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

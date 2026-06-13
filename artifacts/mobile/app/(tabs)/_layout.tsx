@@ -13,8 +13,8 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "divide.circle", selected: "divide.circle.fill" }} />
-        <Label>Calculator</Label>
+        <Icon sf={{ default: "house", selected: "house.fill" }} />
+        <Label>Home</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="brackets">
         <Icon sf={{ default: "list.number", selected: "list.number" }} />
@@ -40,14 +40,7 @@ function ClassicTabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.background },
-        headerShadowVisible: false,
-        headerTitleStyle: {
-          fontFamily: "Inter_600SemiBold",
-          fontSize: 17,
-          color: colors.foreground,
-        },
+        headerShown: false,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.background,
@@ -65,10 +58,7 @@ function ClassicTabLayout() {
             />
           ) : isWeb ? (
             <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}
             />
           ) : null,
         tabBarLabelStyle: {
@@ -80,13 +70,12 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Calculator",
-          headerShown: false,
+          title: "Home",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="divide.circle" tintColor={color} size={24} />
+              <SymbolView name="house" tintColor={color} size={24} />
             ) : (
-              <Feather name="percent" size={22} color={color} />
+              <Feather name="home" size={22} color={color} />
             ),
         }}
       />
@@ -94,7 +83,6 @@ function ClassicTabLayout() {
         name="brackets"
         options={{
           title: "Brackets",
-          headerShown: false,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="list.number" tintColor={color} size={24} />
@@ -107,7 +95,6 @@ function ClassicTabLayout() {
         name="history"
         options={{
           title: "History",
-          headerShown: false,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="clock" tintColor={color} size={24} />

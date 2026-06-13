@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -13,42 +14,40 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import colors from "@/constants/colors";
-import { INCOME_TYPE_LABELS } from "@/constants/taxData";
-import { CalculationEntry, useTax } from "@/context/TaxContext";
+import { PROFESSION_OPTIONS } from "@/constants/taxData";
+import { SavedResult, useWizard } from "@/context/WizardContext";
 
 const c = colors.light;
 
 function formatPKR(n: number) {
-  if (n >= 10000000) return "₨" + (n / 10000000).toFixed(2) + " Cr";
-  if (n >= 100000) return "₨" + (n / 100000).toFixed(1) + " Lac";
-  return "₨" + Math.round(n).toLocaleString("en-PK");
+  if (n >= 10000000) return "₨ " + (n / 10000000).toFixed(2) + " Cr";
+  if (n >= 100000) return "₨ " + (n / 100000).toFixed(1) + " Lac";
+  return "₨ " + Math.round(n).toLocaleString("en-US");
 }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-PK", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+    month: "short", day: "numeric", year: "numeric",
   });
 }
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
-  const { history, deleteHistory, clearHistory } = useTax();
+  const { savedHistory, deleteResult } = useWizard();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const webTop = Platform.OS === "web" ? 67 : insets.top;
   const webBottom = Platform.OS === "web" ? 34 : 0;
 
-  const handleClear = () => {
-    if (Platform.OS === "web") { clearHistory(); return; }
-    Alert.alert("Clear History", "Remove all saved calculations?", [
+  const handleDelete = (id: string) => {
+    if (Platform.OS === "web") { deleteResult(id); return; }
+    Alert.alert("Delete", "Remove this calculation?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Clear All", style: "destructive",
+        text: "Delete", style: "destructive",
         onPress: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          clearHistory();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          deleteResult(id);
         },
       },
     ]);
@@ -60,30 +59,31 @@ export default function HistoryScreen() {
         <View>
           <Text style={styles.heading}>History</Text>
           <Text style={styles.subheading}>
-            {history.length === 0
-              ? "No saved calculations"
-              : `${history.length} saved calculation${history.length > 1 ? "s" : ""}`}
+            {savedHistory.length === 0
+              ? "No saved calculations yet"
+              : `${savedHistory.length} saved result${savedHistory.length > 1 ? "s" : ""}`}
           </Text>
         </View>
-        {history.length > 0 && (
-          <Pressable onPress={handleClear} style={styles.clearBtn}>
-            <Text style={styles.clearBtnText}>Clear All</Text>
-          </Pressable>
-        )}
       </View>
 
       <FlatList
-        data={history}
+        data={savedHistory}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.list, { paddingBottom: webBottom + 120 }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Feather name="clock" size={44} color={c.border} />
+            <Feather name="clock" size={48} color={c.border} />
             <Text style={styles.emptyTitle}>No calculations yet</Text>
             <Text style={styles.emptyText}>
-              Use the Calculator tab and tap "Save"
+              Complete the tax calculator to save a result here
             </Text>
+            <Pressable
+              style={styles.startBtn}
+              onPress={() => router.push("/wizard/1-personal")}
+            >
+              <Text style={styles.startBtnText}>Start Calculator</Text>
+            </Pressable>
           </View>
         }
         renderItem={({ item }) => (
@@ -91,10 +91,7 @@ export default function HistoryScreen() {
             entry={item}
             expanded={expandedId === item.id}
             onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
-            onDelete={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              deleteHistory(item.id);
-            }}
+            onDelete={() => handleDelete(item.id)}
           />
         )}
       />
@@ -105,34 +102,41 @@ export default function HistoryScreen() {
 function HistoryCard({
   entry, expanded, onToggle, onDelete,
 }: {
-  entry: CalculationEntry;
+  entry: SavedResult;
   expanded: boolean;
   onToggle: () => void;
   onDelete: () => void;
 }) {
-  const { result } = entry;
+  const { result, state, laws } = entry;
+  const prof = PROFESSION_OPTIONS.find((p) => p.key === state.professionCategory);
+
   return (
     <View style={styles.card}>
       <Pressable onPress={onToggle} style={styles.cardHeader}>
+        <Text style={styles.cardEmoji}>{prof?.emoji ?? "₨"}</Text>
         <View style={styles.cardLeft}>
-          <Text style={styles.cardIncome}>{formatPKR(entry.grossIncome)}</Text>
+          <Text style={styles.cardName}>{state.name || "Unnamed"}</Text>
           <Text style={styles.cardMeta}>
-            {INCOME_TYPE_LABELS[entry.incomeType]}
-            {entry.isWidow ? " · Widow Relief" : ""}
+            {prof?.label ?? "–"}
+            {state.maritalStatus === "widow" ? " · Widow" : ""}
             {" · "}{formatDate(entry.date)}
           </Text>
         </View>
         <View style={styles.cardRight}>
-          <Text style={styles.cardTax}>{formatPKR(result.finalTax)}</Text>
-          <Text style={styles.cardRate}>
-            {(result.effectiveRate * 100).toFixed(1)}% eff. rate
+          <Text style={styles.cardTax}>
+            {result.isAgriculture ? "Exempt" : formatPKR(result.finalTax)}
           </Text>
+          {!result.isAgriculture && (
+            <Text style={styles.cardRate}>
+              {(result.effectiveRate * 100).toFixed(1)}% eff.
+            </Text>
+          )}
         </View>
         <Feather
           name={expanded ? "chevron-up" : "chevron-down"}
           size={16}
           color={c.mutedForeground}
-          style={{ marginLeft: 8 }}
+          style={{ marginLeft: 6 }}
         />
       </Pressable>
 
@@ -140,14 +144,31 @@ function HistoryCard({
         <>
           <View style={styles.divider} />
           <View style={styles.details}>
-            <DetailRow label="Annual Income" value={formatPKR(entry.grossIncome)} />
-            <DetailRow label="Tax Before Relief" value={formatPKR(result.taxBeforeRelief)} />
-            {entry.isWidow && (
-              <DetailRow label="Widow Relief (50%)" value={`– ${formatPKR(result.widowRelief)}`} highlight />
+            <DRow label="Annual Income" value={formatPKR(state.useMonthly ? parseFloat(state.monthlyIncome) * 12 : parseFloat(state.annualIncome))} />
+            {!result.isAgriculture && (
+              <>
+                <DRow label="Tax before relief" value={formatPKR(result.taxBeforeRelief)} />
+                {result.widowRelief > 0 && (
+                  <DRow label="Widow relief (50%)" value={`– ${formatPKR(result.widowRelief)}`} accent />
+                )}
+                <DRow label="Final tax" value={formatPKR(result.finalTax)} bold />
+                <DRow label="Take-home" value={formatPKR(result.afterTaxIncome)} accent />
+              </>
             )}
-            <DetailRow label="Final Tax" value={formatPKR(result.finalTax)} />
-            <DetailRow label="Take-Home" value={formatPKR(result.afterTaxIncome)} highlight />
           </View>
+
+          {laws.filter((l) => l.isRelief).length > 0 && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.lawsSection}>
+                <Text style={styles.lawsSectionTitle}>Relief applied:</Text>
+                {laws.filter((l) => l.isRelief).map((law, i) => (
+                  <Text key={i} style={styles.lawItem}>✓ {law.title}</Text>
+                ))}
+              </View>
+            </>
+          )}
+
           <View style={styles.divider} />
           <Pressable
             style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}
@@ -162,11 +183,17 @@ function HistoryCard({
   );
 }
 
-function DetailRow({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+function DRow({ label, value, accent = false, bold = false }: {
+  label: string; value: string; accent?: boolean; bold?: boolean;
+}) {
   return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={[styles.detailValue, highlight && { color: c.accent, fontFamily: "Inter_700Bold" }]}>
+    <View style={styles.dRow}>
+      <Text style={styles.dLabel}>{label}</Text>
+      <Text style={[
+        styles.dValue,
+        accent && { color: c.accent },
+        bold && { fontFamily: "Inter_700Bold", color: c.foreground },
+      ]}>
         {value}
       </Text>
     </View>
@@ -185,12 +212,18 @@ const styles = StyleSheet.create({
   },
   heading: { fontSize: 28, fontFamily: "Inter_700Bold", color: c.foreground, marginBottom: 2 },
   subheading: { fontSize: 13, fontFamily: "Inter_400Regular", color: c.mutedForeground },
-  clearBtn: { paddingVertical: 6, paddingHorizontal: 12 },
-  clearBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.destructive },
-  list: { padding: 20, gap: 12 },
+  list: { padding: 16, gap: 10 },
   empty: { alignItems: "center", paddingTop: 80, gap: 10 },
-  emptyTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: c.mutedForeground },
-  emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground, textAlign: "center" },
+  emptyTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: c.mutedForeground },
+  emptyText: {
+    fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground,
+    textAlign: "center", lineHeight: 20,
+  },
+  startBtn: {
+    marginTop: 8, paddingVertical: 12, paddingHorizontal: 24,
+    borderRadius: colors.radius, backgroundColor: c.primary,
+  },
+  startBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#FFFFFF" },
   card: {
     backgroundColor: c.card,
     borderRadius: colors.radius + 2,
@@ -198,24 +231,28 @@ const styles = StyleSheet.create({
     borderColor: c.border,
     overflow: "hidden",
   },
-  cardHeader: { flexDirection: "row", alignItems: "center", padding: 16 },
+  cardHeader: { flexDirection: "row", alignItems: "center", padding: 14, gap: 10 },
+  cardEmoji: { fontSize: 20, width: 26, textAlign: "center" },
   cardLeft: { flex: 1 },
-  cardIncome: { fontSize: 17, fontFamily: "Inter_700Bold", color: c.foreground },
-  cardMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 2 },
+  cardName: { fontSize: 15, fontFamily: "Inter_700Bold", color: c.foreground },
+  cardMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 2 },
   cardRight: { alignItems: "flex-end" },
-  cardTax: { fontSize: 16, fontFamily: "Inter_700Bold", color: c.foreground },
+  cardTax: { fontSize: 15, fontFamily: "Inter_700Bold", color: c.primary },
   cardRate: { fontSize: 11, fontFamily: "Inter_400Regular", color: c.mutedForeground, marginTop: 2 },
-  divider: { height: 1, backgroundColor: c.border, marginHorizontal: 16 },
-  details: { padding: 16, gap: 10 },
-  detailRow: { flexDirection: "row", justifyContent: "space-between" },
-  detailLabel: { fontSize: 14, fontFamily: "Inter_400Regular", color: c.mutedForeground },
-  detailValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: c.foreground },
+  divider: { height: 1, backgroundColor: c.border, marginHorizontal: 14 },
+  details: { padding: 14, gap: 8 },
+  dRow: { flexDirection: "row", justifyContent: "space-between" },
+  dLabel: { fontSize: 13, fontFamily: "Inter_400Regular", color: c.mutedForeground },
+  dValue: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: c.foreground },
+  lawsSection: { padding: 14, gap: 4 },
+  lawsSectionTitle: {
+    fontSize: 12, fontFamily: "Inter_600SemiBold", color: c.mutedForeground,
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4,
+  },
+  lawItem: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.primary },
   deleteBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    padding: 12,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, padding: 12,
   },
   deleteBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: c.destructive },
 });
