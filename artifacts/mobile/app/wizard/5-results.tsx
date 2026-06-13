@@ -27,10 +27,24 @@ function formatPKR(n: number) {
 export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
   const {
-    name, result, laws, derivedAnnual,
-    isWidow, professionCategory,
-    saveResult, resetWizard,
+    name: ctxName,
+    result: ctxResult,
+    laws: ctxLaws,
+    derivedAnnual: ctxDerivedAnnual,
+    isWidow: ctxIsWidow,
+    professionCategory: ctxProfessionCategory,
+    saveResult,
+    resetWizard,
   } = useWizard();
+
+  // Freeze wizard output at mount so resetWizard() doesn't blank the screen
+  // mid-navigation when the user taps "Start Again".
+  const [name] = useState(ctxName);
+  const [result] = useState(ctxResult);
+  const [laws] = useState(ctxLaws);
+  const [derivedAnnual] = useState(ctxDerivedAnnual);
+  const [isWidow] = useState(ctxIsWidow);
+  const [professionCategory] = useState(ctxProfessionCategory);
 
   const [saved, setSaved] = useState(false);
 
@@ -38,12 +52,13 @@ export default function ResultsScreen() {
 
   const profInfo = PROFESSION_OPTIONS.find((p) => p.key === professionCategory);
 
-  // Redirect to start if wizard hasn't been completed
+  // If no result at mount (user landed here without completing wizard), go to step 1.
   useEffect(() => {
     if (!result) {
       router.replace("/wizard/1-personal");
     }
-  }, [result]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once at mount only
 
   const handleSave = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -52,8 +67,10 @@ export default function ResultsScreen() {
   };
 
   const handleStartAgain = () => {
-    resetWizard();
+    // Navigate first — THEN reset, so frozen local state keeps rendering
+    // until the screen actually unmounts (avoids double-navigate crash).
     router.replace("/(tabs)");
+    setTimeout(resetWizard, 300);
   };
 
   if (!result) {
