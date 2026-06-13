@@ -75,3 +75,8 @@ android/.gradle/
 android/build/
 ios/Pods/
 ios/build/
+
+
+deployment_quickstart.md
+uptodown_deployment_guide.md
+apkpure_deployment_guide.md
