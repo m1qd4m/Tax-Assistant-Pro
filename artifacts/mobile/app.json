@@ -15,9 +15,11 @@
     },
     "ios": {
       "supportsTablet": false,
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.miqdaam.taxhelper"
     },
     "android": {
+      "package": "com.miqdaam.taxhelper",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#FFFFFF"
