@@ -98,7 +98,7 @@ export default function PersonalScreen() {
 }
 
 const styles = StyleSheet.create({
-  field: { marginBottom: 28 },
+  field: { marginBottom: 20 },
   fieldLabel: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
@@ -108,18 +108,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   input: {
-    height: 52,
+    height: 46,
     borderRadius: colors.radius,
     borderWidth: 1.5,
     borderColor: c.border,
     backgroundColor: c.card,
     paddingHorizontal: 16,
-    fontSize: 17,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: c.foreground,
   },
-  ageInput: { width: 120 },
-  cardRow: { gap: 8 },
+  ageInput: { width: 110 },
+  cardRow: { gap: 8, flexDirection: "row" },
   genderCard: { flex: 1 },
   noticeCard: {
     marginTop: 12,
