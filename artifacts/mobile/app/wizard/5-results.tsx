@@ -33,7 +33,6 @@ export default function ResultsScreen() {
     derivedAnnual: ctxDerivedAnnual,
     isWidow: ctxIsWidow,
     professionCategory: ctxProfessionCategory,
-    saveResult,
     resetWizard,
   } = useWizard();
 
@@ -45,8 +44,6 @@ export default function ResultsScreen() {
   const [derivedAnnual] = useState(ctxDerivedAnnual);
   const [isWidow] = useState(ctxIsWidow);
   const [professionCategory] = useState(ctxProfessionCategory);
-
-  const [saved, setSaved] = useState(false);
 
   const webBottom = Platform.OS === "web" ? 20 : insets.bottom;
 
@@ -206,22 +203,8 @@ export default function ResultsScreen() {
         </View>
       </ScrollView>
 
-      {/* Action buttons */}
+      {/* Action button */}
       <View style={[styles.footer, { paddingBottom: webBottom + 16 }]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.saveBtn,
-            saved && styles.saveBtnSaved,
-            pressed && !saved && { opacity: 0.8 },
-          ]}
-          onPress={handleSave}
-          disabled={saved}
-        >
-          <Feather name={saved ? "check" : "bookmark"} size={16} color={saved ? c.success : c.primary} />
-          <Text style={[styles.saveBtnText, saved && { color: c.success }]}>
-            {saved ? "Saved!" : "Save Result"}
-          </Text>
-        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.againBtn, pressed && { opacity: 0.8 }]}
           onPress={handleStartAgain}

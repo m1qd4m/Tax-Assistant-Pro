@@ -1,5 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useState } from "react";
 
 import {
   ProfessionCategory,
@@ -9,8 +8,6 @@ import {
   getIncomeType,
   ApplicableLaw,
 } from "@/constants/taxData";
-
-const HISTORY_KEY = "@pk_wizard_history";
 
 export type Gender = "male" | "female" | "other" | "";
 export type MaritalStatus = "married" | "single" | "widow" | "divorced" | "";
@@ -29,14 +26,6 @@ export interface WizardState {
   useMonthly: boolean;
 }
 
-export interface SavedResult {
-  id: string;
-  date: string;
-  state: WizardState;
-  result: TaxResult;
-  laws: ApplicableLaw[];
-}
-
 interface WizardContextType extends WizardState {
   setName: (v: string) => void;
   setGender: (v: Gender) => void;
@@ -53,9 +42,6 @@ interface WizardContextType extends WizardState {
   result: TaxResult | null;
   laws: ApplicableLaw[];
   isWidow: boolean;
-  savedHistory: SavedResult[];
-  saveResult: () => void;
-  deleteResult: (id: string) => void;
   resetWizard: () => void;
 }
 
@@ -77,21 +63,9 @@ const WizardContext = createContext<WizardContextType | null>(null);
 
 export function WizardProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WizardState>(defaultState);
-  const [savedHistory, setSavedHistory] = useState<SavedResult[]>([]);
-
-  useEffect(() => {
-    AsyncStorage.getItem(HISTORY_KEY).then((raw) => {
-      if (raw) { try { setSavedHistory(JSON.parse(raw)); } catch {} }
-    });
-  }, []);
 
   const update = <K extends keyof WizardState>(key: K) => (val: WizardState[K]) =>
     setState((s) => ({ ...s, [key]: val }));
-
-  const persistHistory = useCallback((entries: SavedResult[]) => {
-    setSavedHistory(entries);
-    AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
-  }, []);
 
   const annualFromMonthly = (parseFloat(state.monthlyIncome.replace(/,/g, "")) || 0) * 12;
   const directAnnual = parseFloat(state.annualIncome.replace(/,/g, "")) || 0;
@@ -120,23 +94,6 @@ export function WizardProvider({ children }: { children: React.ReactNode }) {
         })
       : [];
 
-  const saveResult = useCallback(() => {
-    if (!result) return;
-    const entry: SavedResult = {
-      id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
-      date: new Date().toISOString(),
-      state,
-      result,
-      laws,
-    };
-    persistHistory([entry, ...savedHistory]);
-  }, [result, state, laws, savedHistory, persistHistory]);
-
-  const deleteResult = useCallback(
-    (id: string) => persistHistory(savedHistory.filter((e) => e.id !== id)),
-    [savedHistory, persistHistory]
-  );
-
   const resetWizard = useCallback(() => setState(defaultState), []);
 
   return (
@@ -158,9 +115,6 @@ export function WizardProvider({ children }: { children: React.ReactNode }) {
         result,
         laws,
         isWidow,
-        savedHistory,
-        saveResult,
-        deleteResult,
         resetWizard,
       }}
     >

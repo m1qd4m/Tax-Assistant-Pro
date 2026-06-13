@@ -20,10 +20,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "list.number", selected: "list.number" }} />
         <Label>Brackets</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="history">
-        <Icon sf={{ default: "clock", selected: "clock.fill" }} />
-        <Label>History</Label>
-      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -88,18 +84,6 @@ function ClassicTabLayout() {
               <SymbolView name="list.number" tintColor={color} size={24} />
             ) : (
               <Feather name="list" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: "History",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="clock" tintColor={color} size={24} />
-            ) : (
-              <Feather name="clock" size={22} color={color} />
             ),
         }}
       />

@@ -13,26 +13,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import colors from "@/constants/colors";
-import { PROFESSION_OPTIONS } from "@/constants/taxData";
 import { useWizard } from "@/context/WizardContext";
 
 const c = colors.light;
 
-function formatPKR(n: number) {
-  if (n >= 10000000) return "₨ " + (n / 10000000).toFixed(2) + " Cr";
-  if (n >= 100000) return "₨ " + (n / 100000).toFixed(1) + " Lac";
-  return "₨ " + Math.round(n).toLocaleString("en-US");
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-PK", {
-    month: "short", day: "numeric", year: "numeric",
-  });
-}
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { savedHistory, resetWizard, deleteResult } = useWizard();
+  const { resetWizard } = useWizard();
 
   const webTop = Platform.OS === "web" ? 67 : insets.top;
   const webBottom = Platform.OS === "web" ? 34 : 0;
@@ -94,35 +81,6 @@ export default function HomeScreen() {
         <FeatureItem icon="sun" text="Agricultural income federal exemption" />
         <FeatureItem icon="book-open" text="Relevant FBR laws explained in plain language" />
       </View>
-
-      {/* Recent history */}
-      {savedHistory.length > 0 && (
-        <View style={styles.historySection}>
-          <Text style={styles.historySectionTitle}>Recent Calculations</Text>
-          {savedHistory.slice(0, 3).map((entry) => {
-            const prof = PROFESSION_OPTIONS.find((p) => p.key === entry.state.professionCategory);
-            return (
-              <View key={entry.id} style={styles.historyItem}>
-                <Text style={styles.historyEmoji}>{prof?.emoji ?? "₨"}</Text>
-                <View style={styles.historyItemText}>
-                  <Text style={styles.historyName}>{entry.state.name || "Unnamed"}</Text>
-                  <Text style={styles.historyMeta}>
-                    {prof?.label ?? "–"} · {formatDate(entry.date)}
-                  </Text>
-                </View>
-                <Text style={styles.historyTax}>
-                  {entry.result.isAgriculture ? "Exempt" : formatPKR(entry.result.finalTax)}
-                </Text>
-              </View>
-            );
-          })}
-          {savedHistory.length > 3 && (
-            <Text style={styles.moreHistory}>
-              +{savedHistory.length - 3} more in History tab
-            </Text>
-          )}
-        </View>
-      )}
 
       <View style={styles.fbrNote}>
         <Text style={styles.fbrNoteText}>
@@ -237,46 +195,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: c.foreground,
     lineHeight: 19,
-  },
-
-  historySection: { marginBottom: 20 },
-  historySectionTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: c.foreground,
-    marginBottom: 10,
-  },
-  historyItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: c.card,
-    borderRadius: colors.radius,
-    borderWidth: 1,
-    borderColor: c.border,
-    padding: 12,
-    marginBottom: 8,
-  },
-  historyEmoji: { fontSize: 20, width: 28, textAlign: "center" },
-  historyItemText: { flex: 1 },
-  historyName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: c.foreground },
-  historyMeta: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: c.mutedForeground,
-    marginTop: 2,
-  },
-  historyTax: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: c.primary,
-  },
-  moreHistory: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: c.mutedForeground,
-    textAlign: "center",
-    paddingTop: 4,
   },
 
   fbrNote: {
