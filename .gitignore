@@ -47,3 +47,32 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+# dependencies
+node_modules/
+
+# builds
+dist/
+build/
+
+# react native / expo
+.expo/
+
+# env
+.env
+
+# logs
+*.log
+
+# OS
+.DS_Store
+
+# replit junk
+.agents/
+artifacts/
+attached_assets/
+
+# android/ios junk
+android/.gradle/
+android/build/
+ios/Pods/
+ios/build/
